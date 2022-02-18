@@ -11,6 +11,8 @@ using Random = UnityEngine.Random;
 [SuppressMessage("ReSharper", "InconsistentNaming")]
 public class GMScript : MonoBehaviour
 {
+
+
     public TileBase pieceTile;
     public TileBase emptyTile;
     public TileBase chunkTile;
@@ -35,7 +37,9 @@ public class GMScript : MonoBehaviour
 
     // private int _width = 0, _height = 0;
     private readonly int BOUNDS_MAX = 20;
+    //falling tile
     private Vector3Int[] _myPiece;
+    //landed tiles
     private Vector3Int[] _myChunk;
     
     
@@ -204,6 +208,7 @@ public class GMScript : MonoBehaviour
 
     private bool RotatePiece()
     {
+        //Want to rotate around 1st element in array
         // rotated_x = (current_y + origin_x - origin_y)
         // rotated_y = (origin_x + origin_y - current_x - ?max_length_in_any_direction)
         
@@ -232,6 +237,7 @@ public class GMScript : MonoBehaviour
     }
     bool AddChunkAtPoint(Vector3Int chunkPoint)
     {
+        //if it is null, give me a new one
         _myChunk ??= new Vector3Int[] {};
         if (_myChunk.Any(p => p.x == chunkPoint.x && p.y == chunkPoint.y))
             return false;
@@ -307,6 +313,7 @@ public class GMScript : MonoBehaviour
         return AddChunkAtPoint(RandomEnemyPoint());
     }
     
+    // Have stuff fall at fixed rate
     void FixedUpdate()
     {
         if (0 != _fixedUpdateCount++ % _fixedUpdateFramesToWait) return;
@@ -330,6 +337,7 @@ public class GMScript : MonoBehaviour
         _fixedUpdateCount = 1;
     }
     
+    // For input
     void Update()
     {
         if (null == Camera.main) return; 
