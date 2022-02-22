@@ -6,13 +6,26 @@ using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 using Random = UnityEngine.Random;
+using UnityEngine.UI;
 
 // ReSharper disable once InconsistentNaming
 [SuppressMessage("ReSharper", "InconsistentNaming")]
 public class GMScript : MonoBehaviour
 {
 
+    // 2. Figure out how to keep track of the number of tetrises over several games
+    private int[] pastScore; 
+    private bool reverse;
+    private bool dropOff;
+    private bool randomChunkOff;
+    private int numGames;
+    private byte opacity;
+    public Image obscureView;
+    private double average12;
+    private double average345;
+    private double totalAverage;
 
+ 
     public TileBase pieceTile;
     public TileBase emptyTile;
     public TileBase chunkTile;
@@ -75,6 +88,12 @@ public class GMScript : MonoBehaviour
         _dirty = true;
         _initialized = false;
         InitializePieces();
+         pastScore = new int[4]; 
+        reverse = false;
+        dropOff = false;
+        randomChunkOff = false;
+        numGames = 0;
+         opacity = 0;
     }
 
 
@@ -163,7 +182,7 @@ public class GMScript : MonoBehaviour
                
                return KillRow(row);
             }
-        }
+                 }
 
         return false;
     }
@@ -250,7 +269,7 @@ public class GMScript : MonoBehaviour
         if (null == _myPiece) return;
         while (ShiftPiece(0, -1)) { }
 
-        _myChunk ??= new Vector3Int[] {};
+        _myChunk ??= new Vector3Int[] {}; 
         _myChunk = _myChunk.Concat(_myPiece).ToArray();
         _myPiece = null;
     }
@@ -318,6 +337,7 @@ public class GMScript : MonoBehaviour
     {
         if (0 != _fixedUpdateCount++ % _fixedUpdateFramesToWait) return;
         DoTetrisDown();
+
         if (_inARow > _difficulty)
         {
             _difficulty = _inARow;
@@ -330,11 +350,17 @@ public class GMScript : MonoBehaviour
         if (CheckKillChunk())
         {
             _inARow++;
-            MakeRandomAngryChunk();
+            if(!randomChunkOff) {
+                MakeRandomAngryChunk();
+            }
+          
         }
+        
+
         else _inARow = 0;
         infoText.text = $"PTS:{_score}\n\nMAX:{_difficulty}\n\nCURRIC\n576";
         _fixedUpdateCount = 1;
+       
     }
     
     // For input
@@ -347,14 +373,25 @@ public class GMScript : MonoBehaviour
             if (!MakeNewPiece(0,_maxBy))
             {   
                 Debug.Log("NO VALID MOVE");
-                Debug.Break();
+
+                 _myPiece = null;
+                _myChunk = null;
+                _dirty = true;
+                _initialized = false;
+                InitializePieces();
+                _difficulty = 0;
+                _score = 0;
+                numGames++;
+                AdaptGame();
+                //Debug.Break();
             }
         }
         
-        
-        if (Input.GetKeyDown(KeyCode.Q)) { Debug.Break(); }
-        else if (Input.GetMouseButtonDown(0)) 
-        {
+
+        if(reverse == false) {   
+              if (Input.GetKeyDown(KeyCode.Q)) { Debug.Break(); }
+             else if (Input.GetMouseButtonDown(0)) 
+            {
             var point = Camera.main.ScreenToWorldPoint(Input.mousePosition); 
             Vector3Int selectedTile = boardMap.WorldToCell(point);
             AddChunkAtPoint(selectedTile);
@@ -364,14 +401,77 @@ public class GMScript : MonoBehaviour
         else if (Input.GetKeyDown(KeyCode.LeftArrow)) { DoTetrisLeft(); }
         else if (Input.GetKeyDown(KeyCode.RightArrow)) { DoTetrisRight(); }
         else if (Input.GetKeyDown(KeyCode.UpArrow)) { DoTetrisUp(); }
-        else if (Input.GetKeyDown(KeyCode.DownArrow)) { DoTetrisDrop(); }
+        else if (Input.GetKeyDown(KeyCode.DownArrow) && dropOff == false) { DoTetrisDrop(); }
+        }
+         
+        // Reverses the controls
+        else {
+             if (Input.GetKeyDown(KeyCode.Q)) { Debug.Break(); }
+        else if (Input.GetMouseButtonDown(0)) 
+        {
+            var point = Camera.main.ScreenToWorldPoint(Input.mousePosition); 
+            Vector3Int selectedTile = boardMap.WorldToCell(point);
+            AddChunkAtPoint(selectedTile);
+            // Debug.Log(selectedTile);
+            // boardMap.SetTile(selectedTile, pieceTile); 
+        }
+        else if (Input.GetKeyDown(KeyCode.LeftArrow)) { DoTetrisRight(); }
+        else if (Input.GetKeyDown(KeyCode.RightArrow)) { DoTetrisLeft(); }
+        else if (Input.GetKeyDown(KeyCode.UpArrow) && dropOff == false) { DoTetrisDrop(); }
+        else if (Input.GetKeyDown(KeyCode.DownArrow)) { DoTetrisUp(); }
 
+        }
+
+    
         if (_dirty)
         {
             DrawBoard();
             DrawPiece();
         }
     } 
-    
-   
+
+    void AdaptGame() {    
+        if(numGames >= 5) {
+            average12 = (pastScore[0] + pastScore[1]) / 2;
+            average345 = (pastScore[2] + pastScore[3] + _score) / 3;
+            totalAverage = ((average12 * 2) + (average345 * 3)) /5;
+
+
+            // Turns the drop function off
+            if(totalAverage < 3) {
+                    dropOff = true;
+            }
+            //Turns the random chuck off
+            if(totalAverage < 5) {
+                randomChunkOff = true;
+            }
+            // Reverses the controls
+            if(totalAverage > 20) {
+                reverse = true;
+            }
+            // If you score above 10 and have been increasing 
+            // in the amount of tetrises, it starts obsuring your vision.
+            if(totalAverage > 10) {
+                if(average12 < average345) {
+                    if(opacity + 20 >= 255) {
+                       opacity = 255;                     
+
+                    } else {
+                        opacity += 20;
+                    }
+                }
+                else {
+                    opacity -=20;
+                }
+            }
+            obscureView.GetComponent<Image>().color = new Color32(255,255,255,opacity);
+            for(int i = 0; i < 3; i++) {
+                pastScore[i] = pastScore[i+1];
+            }
+            pastScore[3] = _score;
+            } else {
+                pastScore[numGames - 1] = _score;
+            }
+
+        }  
 }
